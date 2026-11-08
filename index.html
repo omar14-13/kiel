@@ -1,0 +1,97 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الشمعة</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{color-scheme:dark;--bg:#000;--fg:#c9b79c;--red:#b01010}
+*{margin:0;box-sizing:border-box}html,body{height:100%;background:var(--bg);overflow:hidden;font-family:Tahoma,Arial,sans-serif;color:var(--fg)}
+canvas{display:block}
+#start{position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:9}
+#txt{position:fixed;top:40%;width:100%;text-align:center;font-size:clamp(28px,6vw,60px);color:var(--red);text-shadow:0 0 18px #600;letter-spacing:2px;pointer-events:none;z-index:5;min-height:70px}
+#hint{position:fixed;bottom:14px;width:100%;text-align:center;font-size:16px;opacity:.8;pointer-events:none;z-index:5;text-shadow:0 0 6px #000}
+#candle{position:fixed;left:3vw;bottom:-6vh;height:48vh;z-index:4;pointer-events:none;animation:bob 3s ease-in-out infinite;filter:drop-shadow(0 0 30px #fa0)}
+@keyframes bob{50%{transform:translate(4px,8px) rotate(1.5deg)}}
+#axe{position:fixed;right:5vw;bottom:-8vh;height:52vh;z-index:4;pointer-events:none;display:none;transform-origin:50% 100%;transition:transform .12s}
+#axe.sw{transform:rotate(-35deg) translate(-8vw,-6vh)}
+#morse{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:8vw;font:clamp(18px,3.2vw,34px) monospace;letter-spacing:.15em;line-height:1.8;color:#ddd;opacity:0;transition:opacity 2s;pointer-events:none;z-index:9}
+#fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 2.5s;z-index:8}
+</style></head><body>
+<div id="start">ادخل</div><div id="txt"></div><div id="hint"></div>
+<img id="candle" src="images/candle.png"><img id="axe" src="images/axe.png"><div id="fade"></div><div id="morse" dir="ltr">-.-- --- ..- / -.. --- / -. --- - / -.- -. --- .-- / .-- .... .- - / -.-- --- ..- / .- .-. . / .-.. --- --- -.- .. -. --. / ..-. --- .-.</div>
+<script src="assets.js"></script>
+<script>
+function L(u,ok,bad){const s=document.createElement("script");s.src=u;s.onload=ok;s.onerror=bad;document.head.appendChild(s)}
+L("three.min.js",boot,()=>L("https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",boot,()=>document.getElementById("start").textContent="تحتاج إنترنت أو ملف three.min.js بجانب اللعبة"));
+function boot(){
+const EYES=ASSETS.eyes;
+const G=["1111111111111","1000000000111","1010111110111","1000100010111","1010101010111","1000000010111","1011111011111","1000000000001","1111111111111"];
+const S=3,H=3,BR=[1,4],EC=[5,9],AC=[7,11];
+const extra=new Set(),wall=(r,c)=>extra.has(r+','+c)||!(G[r]&&G[r][c]==='0');
+const $=id=>document.getElementById(id);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0);scene.fog=new THREE.FogExp2(0,.09);
+const cam=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,60);cam.rotation.order='YXZ';cam.position.set(S,1.6,S);scene.add(cam);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setSize(innerWidth,innerHeight);document.body.prepend(ren.domElement);
+addEventListener('resize',()=>{ren.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()});
+function tex(draw,rx,ry){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');draw(x);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx||1,ry||1);return t}
+const mk=(b,lo,hi)=>tex(x=>{x.fillStyle=b;x.fillRect(0,0,128,128);for(let i=0;i<500;i++){const v=lo+Math.random()*(hi-lo);x.fillStyle=`rgb(${v},${v},${v})`;x.fillRect(Math.random()*128,Math.random()*128,2+Math.random()*8,2+Math.random()*6)}x.strokeStyle='#222';x.lineWidth=3;for(let y=0;y<=128;y+=32){x.beginPath();x.moveTo(0,y);x.lineTo(128,y);x.stroke()}});
+const stone=mk('#777',90,150),stW=mk('#ddd',190,245),stB=mk('#161616',10,45);
+const wood=tex(x=>{x.fillStyle='#6b4423';x.fillRect(0,0,128,128);for(let i=0;i<60;i++){x.strokeStyle=`rgba(${30+Math.random()*40},${15+Math.random()*20},5,.6)`;x.beginPath();const y=Math.random()*128;x.moveTo(0,y);x.lineTo(128,y+Math.random()*6-3);x.stroke()}});
+const floorT=tex(x=>{x.fillStyle='#2b2724';x.fillRect(0,0,128,128);for(let i=0;i<300;i++){const v=20+Math.random()*30;x.fillStyle=`rgb(${v},${v},${v})`;x.fillRect(Math.random()*128,Math.random()*128,3,3)}},20,14);
+const wms=[stW,stone,stB].map(m=>new THREE.MeshLambertMaterial({map:m}));
+G.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='1'){const m=new THREE.Mesh(new THREE.BoxGeometry(S,H,S),wms[(r*7+c*13)%3]);m.position.set(c*S,H/2,r*S);scene.add(m)}}));
+const W=G[0].length*S,D=G.length*S;
+[[floorT,0],[stone,H]].forEach(([t,y],i)=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(W,D),new THREE.MeshLambertMaterial({map:t}));p.rotation.x=i?Math.PI/2:-Math.PI/2;p.position.set(W/2-S/2,y,D/2-S/2);scene.add(p)});
+// barricade
+const bar=new THREE.Group();bar.position.set(BR[1]*S,0,BR[0]*S);
+const pm=new THREE.MeshLambertMaterial({map:wood});
+for(let i=0;i<5;i++){const p=new THREE.Mesh(new THREE.BoxGeometry(.25,.5,S*.95),pm);p.position.y=.35+i*.55;p.rotation.x=(Math.random()-.5)*.1;bar.add(p)}
+[.7,-.7].forEach(a=>{const p=new THREE.Mesh(new THREE.BoxGeometry(.3,.45,4),pm);p.position.y=1.5;p.rotation.x=a;bar.add(p)});
+scene.add(bar);let barUp=true,hits=0;
+// pickups
+function sprite(src,w,h,pos,add){const t=new THREE.TextureLoader().load(src);const m=new THREE.SpriteMaterial({map:t,transparent:true,fog:false});if(add){m.blending=THREE.AdditiveBlending;m.depthWrite=false}const s=new THREE.Sprite(m);s.scale.set(w,h,1);s.position.copy(pos);scene.add(s);return s}
+const axeS=sprite(ASSETS.axe,.9,.9,new THREE.Vector3(AC[1]*S,.7,AC[0]*S));axeS.material.fog=true;
+const eyes=sprite(EYES,2.4,2.4,new THREE.Vector3(EC[1]*S,1.6,EC[0]*S+1.3),true);
+eyes.visible=false;
+const light=new THREE.PointLight(0xffa040,1.7,13,1.5);cam.add(light);light.position.set(.3,-.2,0);
+scene.add(new THREE.AmbientLight(0x221a14,.35));
+// audio (real .wav files in /sounds)
+const snd={};['step','candle','hit','break','whisper','tick','pickup','end'].forEach(k=>snd[k]=new Audio('sounds/'+k+'.wav'));
+function play(k,v,r){const a=snd[k].cloneNode();a.volume=Math.min(1,v);a.playbackRate=r||1;a.play().catch(()=>{})}
+const sStep=()=>play('step',.7,.9+Math.random()*.25),sWood=big=>play(big?'break':'hit',1),sTick=()=>play('tick',.3),sWhisper=()=>play('whisper',.8);
+function startAudio(){const c=snd.candle;c.loop=true;c.volume=.45;c.play().catch(()=>{})}
+// input
+let yaw=-Math.PI/2,pitch=0,locked=false,ended=false,hasAxe=false;const keys={};
+$('start').onclick=()=>{startAudio();ren.domElement.requestPointerLock()};
+document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===ren.domElement;$('start').style.display=locked||ended?'none':'flex';$('start').textContent='ادخل'});
+addEventListener('mousemove',e=>{if(!locked)return;yaw-=e.movementX*.0022;pitch=Math.max(-1.2,Math.min(1.2,pitch-e.movementY*.0022))});
+addEventListener('keydown',e=>keys[e.code]=1);addEventListener('keyup',e=>keys[e.code]=0);
+const msg=t=>{return;$('hint').textContent=t;clearTimeout(msg.t);msg.t=setTimeout(()=>$('hint').textContent='',3500)};
+const dist=(a,b)=>Math.hypot(cam.position.x-a.x,cam.position.z-a.z);
+addEventListener('mousedown',()=>{if(!locked||ended)return;if(!hasAxe){msg('محتاج حاجة تفتح بيها الطريق...');return}
+ const a=$('axe');a.classList.add('sw');setTimeout(()=>a.classList.remove('sw'),160);
+ if(barUp&&dist(bar.position)<4.2){hits++;sWood(hits>=3);bar.children.forEach(p=>p.position.z+=(Math.random()-.5)*.1);if(hits>=3){scene.remove(bar);barUp=false;eyes.visible=true;msg('انفتح الطريق')}}else play('hit',.15,1.6)});
+const blocked=(x,z)=>{for(const[dx,dz]of[[.4,.4],[-.4,.4],[.4,-.4],[-.4,-.4]]){const c=Math.round((x+dx)/S),r=Math.round((z+dz)/S);if(wall(r,c)||(barUp&&r===BR[0]&&c===BR[1]))return true}return false};
+// story
+let stage=0,trapped=false;
+function closeBehind(){trapped=true;extra.add('2,9');const m=new THREE.Mesh(new THREE.BoxGeometry(S,H,S),wms[2]);m.position.set(9*S,-H/2,2*S);scene.add(m);let k=0;(function r(){k+=.03;m.position.y=Math.min(H/2,-H/2+k*H);if(k<1)requestAnimationFrame(r)})();play('end',1)}
+function speak(s){try{const u=new SpeechSynthesisUtterance(s);u.lang='ar-SA';u.pitch=.1;u.rate=.45;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+
+function type(t,done){const el=$('txt');el.textContent='';let i=0;sWhisper();speak(t);(function n(){if(i<t.length){el.textContent+=t[i++];sTick();setTimeout(n,t[i-1]=='.'?260:90)}else done&&done()})()}
+function story(){stage=1;type('اخرج...من هنا',()=>setTimeout(()=>{$('txt').textContent='';setTimeout(()=>type('اخرج...ديفيد',()=>setTimeout(finish,2500)),700)},2800))}
+function finish(){ended=true;$('txt').textContent='';$('fade').style.opacity=1;play('end',1);snd.candle.pause();document.exitPointerLock();setTimeout(()=>{$('morse').style.opacity=1},2800);setTimeout(()=>{document.body.innerHTML='';document.body.style.background='#000';window.close()},2800+15000)}
+// loop
+let last=performance.now(),stepT=0;
+function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;
+ if(locked&&!ended){const sp=(keys.ShiftLeft?3.6:2.2)*dt;let fx=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0),sx=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+  if(stage==1)fx=sx=0;
+  const mx=(-Math.sin(yaw)*fx+Math.cos(yaw)*sx)*sp,mz=(-Math.cos(yaw)*fx-Math.sin(yaw)*sx)*sp;
+  if(!blocked(cam.position.x+mx,cam.position.z))cam.position.x+=mx;if(!blocked(cam.position.x,cam.position.z+mz))cam.position.z+=mz;
+  if(fx||sx){stepT-=dt;if(stepT<=0){sStep();stepT=keys.ShiftLeft?.32:.5}}else stepT=0;
+  if(!hasAxe&&dist(axeS.position)<1.6){hasAxe=true;scene.remove(axeS);$('axe').style.display='block';play('pickup',.8);msg('لقيت الفأس! اضغط بالماوس على الخشب لكسره')}
+  if(barUp&&!hasAxe&&dist(bar.position)<2.6)msg('الطريق مسدود بالخشب...');
+  if(!trapped&&!barUp&&cam.position.z>8.5&&cam.position.z<17&&Math.abs(cam.position.x-9*S)<2)closeBehind();if(!stage&&trapped&&dist(eyes.position)<6)story()}
+ cam.rotation.set(pitch,yaw,0);cam.position.y=1.6+(stepT>0?Math.sin(now/110)*.03:0);
+ light.intensity=1.6+Math.sin(now/90)*.12+Math.sin(now/37)*.1+(Math.random()-.5)*.1;
+ if(!hasAxe)axeS.position.y=.7+Math.sin(now/500)*.08;
+ ren.render(scene,cam)}
+requestAnimationFrame(loop);
+}
+</script></body></html>
